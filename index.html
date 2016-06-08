@@ -5,19 +5,307 @@
     <link rel="stylesheet" type="text/css" href="https://cdn.mxpnl.com/libs/mixpanel-platform/css/reset.css">
     <link rel="stylesheet" type="text/css" href="https://cdn.mxpnl.com/libs/mixpanel-platform/build/mixpanel-platform.v0.latest.min.css">
     <script src="https://cdn.mxpnl.com/libs/mixpanel-platform/build/mixpanel-platform.v0.latest.min.js"></script>
+    <!-- Latest compiled and minified CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+
+    <!-- Optional theme -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap-theme.min.css" integrity="sha384-fLW2N01lMqjakBkx3l/M9EahuwpSfeNvV63J5ezn3uZzapT0u7EYsXMjQV+0En5r" crossorigin="anonymous">
+
+    <!-- Latest compiled and minified JavaScript -->
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
+    <link href="css/bootstrap.min.css" rel="stylesheet">
+
+
   </head>
   <body class="mixpanel-platform-body">
-    <h1>Hello, World!</h1>
+    <div class=".container-fluid">
+      <div class="row">
+        <div class="col-md-12">
+          <h1 class="text-center text-info"><strong>New User Dashboard</strong></h2>
+        </div>
+      </div>
+      <div class="row">
+        <div  class="col-md-12">
+          <h2 id="new-users-header" class="text-center text-info m-t-1"><strong></strong></h2>
+          <br>
+          <div id="new-users"></div>
+        </div>
+      </div>
+      <br><br>
+      <div class="row">
+        <div class="col-md-12">
+          <h2 id="returning-users-header" class="text-center text-info m-t-1"><strong></strong></h2>
+          <br>
+          <div id="returning-users"></div>
+        </div>
+      </div>
+      <br><br>
+      <div class="row">
+        <div class="col-md-12">
+          <h2 id="returning-retention-header" class="text-center text-info m-t-1"><strong></strong></h2>
+          <br>
+          <div id="returning-retention-users"></div>
+        </div>
+      </div>
+      <br><br>
+      <div class="row">
+        <div class="col-md-12">
+          <h2 id="new-retention-header" class="text-center text-info"><strong></strong></h2>
+          <br>
+          <div id="new-retention-users"></div>
+        </div>
+      </div>
+          
+        
+    </div>
+
+    
     <script>
-      // optional
+      
+    $(document).ready(function(){
+      //set Charts
+      var newUserChart = $('#new-users').MPChart({chartType:"line"}) 
+      var returningUserChart = $('#returning-users').MPChart({chartType:"line"})
+      var returningRetention = $('#returning-retention-users').highcharts()
+
+      // Get the top events for the project
         var params = {
             type: 'general',  // analysis type for the data, can be 'general', 'unique', or 'average'
-            limit: 3          // maximum number of results to return
+            limit: 20          // maximum number of results to return
         };
-        
+        var topEvents =[]
         MP.api.topEvents(params).done(function(results) {
-            console.log('top events\n', results.values());
+            
+          _.each(results.values(), function(e){
+            topEvents.push(e)
+          })
+          //new users query
+          MP.api.query('/api/2.0/events/', {event:topEvents, unit: 'day', from:moment().subtract(40, 'days'), to:moment().subtract(10, 'days'), union: 2, type:'general', where: 'properties["App Open Count"] < 6'  }, {dataType: 'json'}).done(function(json) {
+              
+              var data = MP.Data.inst(json.data)
+              
+              $("#new-users-header").html('New Users')
+              newUserChart.MPChart('setData', data.values().values)
+          })
+           MP.api.query('/api/2.0/events/', {event:topEvents, unit: 'day', from:moment().subtract(40, 'days'), to:moment().subtract(10, 'days'), union: 2, type:'general', where: 'properties["App Open Count"] > 5'  }, {dataType: 'json'}).done(function(json) {
+              
+              var data = MP.Data.inst(json.data)
+              
+               $("#returning-users-header").html('Returning Users')
+              returningUserChart.MPChart('setData', data.values().values)
+          })
         });
+        MP.api.retention('App Open', {from: moment().subtract(3, 'month'), to:moment(), unit:'week', interval_count: 12, limit: 100, where:'properties["App Open Count"] > 5'}).done(function(results3) {
+            console.log('retention results \n', results3.values());
+            var dataStore = results3.values()
+            _.each(dataStore, function(e){
+               var day = 1
+               _.each(e.counts, function(x){
+                e[day] = x
+                day++
+               })
+               e[0] = e.first
+            })
+
+            console.log("datastore transformation 1 \n", dataStore)
+            _.each(dataStore, function(item){
+              delete item.counts
+              delete item.first
+            })
+            console.log("datastore transformation 2 \n", dataStore)
+            var dataStoreArray = []
+            var weekArray =[]
+            _.each(dataStore, function(data, key){  
+              weekArray.push(key)
+            })
+            $("#returning-retention-header").html('Returning Users Churn')
+            $('#returning-retention-users').highcharts({
+                title: {
+                    text: '',
+                    x: -20 //center
+                },
+                xAxis: {
+                    categories: ['Orignal Cohort', '1 Week Later', '2 Weeks Later', '3 Weeks Later', '4 Weeks Later', '5 Weeks Later',
+                        '6 Weeks Later', '7 Weeks Later', "8 Weeks Later", "9 Weeks Later", "10 Weeks Later", "11 Weeks Later","12 Weeks Later"]
+                },
+                yAxis: {
+                    title: {
+                        text: 'Number of Users'
+                    },
+                    
+                },
+                legend: {
+                    align: 'center',
+                    borderWidth: 2,
+                    title: {
+                      text: "Returning User Weekly Cohorts"
+                    }
+                },
+                series:[{
+                  name: weekArray[0],
+                  data: [dataStore[weekArray[0]]['0'],dataStore[weekArray[0]]['1'],dataStore[weekArray[0]]['2'],dataStore[weekArray[0]]['3'],dataStore[weekArray[0]]['4'],dataStore[weekArray[0]]['5'],dataStore[weekArray[0]]['6'],dataStore[weekArray[0]]['7'],dataStore[weekArray[0]]['8'],dataStore[weekArray[0]]['9'],dataStore[weekArray[0]]['10'],,dataStore[weekArray[0]]['11'],dataStore[weekArray[0]]['12']]
+                  },
+                  {
+                    name: weekArray[1],
+                    data: [dataStore[weekArray[1]]['0'],dataStore[weekArray[1]]['1'],dataStore[weekArray[0]]['2'],dataStore[weekArray[1]]['3'],dataStore[weekArray[1]]['4'],dataStore[weekArray[1]]['5'],dataStore[weekArray[1]]['6'],dataStore[weekArray[1]]['7'],dataStore[weekArray[1]]['8'],dataStore[weekArray[1]]['9'],dataStore[weekArray[1]]['10'],,dataStore[weekArray[1]]['11'],dataStore[weekArray[1]]['12']]
+                  },
+                  {
+                    name:weekArray[2],
+                    data: [dataStore[weekArray[2]]['0'],dataStore[weekArray[2]]['1'],dataStore[weekArray[2]]['2'],dataStore[weekArray[2]]['3'],dataStore[weekArray[2]]['4'],dataStore[weekArray[2]]['5'],dataStore[weekArray[2]]['6'],dataStore[weekArray[2]]['7'],dataStore[weekArray[2]]['8'],,dataStore[weekArray[2]]['9'],dataStore[weekArray[2]]['10'],dataStore[weekArray[2]]['11'],dataStore[weekArray[2]]['12']]
+                  },
+                  {
+                    name:weekArray[3],
+                    data: [dataStore[weekArray[3]]['0'],dataStore[weekArray[3]]['1'],dataStore[weekArray[3]]['2'],dataStore[weekArray[3]]['3'],dataStore[weekArray[3]]['4'],dataStore[weekArray[3]]['5'],dataStore[weekArray[3]]['6'],dataStore[weekArray[3]]['7'],dataStore[weekArray[3]]['8'],dataStore[weekArray[3]]['9'],dataStore[weekArray[3]]['10'],dataStore[weekArray[3]]['11'],dataStore[weekArray[3]]['12']]
+                  },
+                  {
+                    name:weekArray[4],
+                    data: [dataStore[weekArray[4]]['0'],dataStore[weekArray[4]]['1'],dataStore[weekArray[4]]['2'],dataStore[weekArray[4]]['3'],dataStore[weekArray[4]]['4'],dataStore[weekArray[4]]['5'],dataStore[weekArray[4]]['6'],dataStore[weekArray[4]]['7'],dataStore[weekArray[4]]['8'],dataStore[weekArray[4]]['9'],dataStore[weekArray[4]]['10'],dataStore[weekArray[4]]['11'],dataStore[weekArray[4]]['12']]
+                  },
+                  {
+                    name:weekArray[5],
+                    data: [dataStore[weekArray[5]]['0'],dataStore[weekArray[5]]['1'],dataStore[weekArray[5]]['2'],dataStore[weekArray[5]]['3'],dataStore[weekArray[5]]['4'],dataStore[weekArray[5]]['5'],dataStore[weekArray[5]]['6'],dataStore[weekArray[5]]['7'],dataStore[weekArray[5]]['8'],dataStore[weekArray[5]]['9'],dataStore[weekArray[5]]['10'],dataStore[weekArray[5]]['11'],dataStore[weekArray[5]]['12']]
+                  },
+                  {
+                    name:weekArray[6],
+                    data: [dataStore[weekArray[6]]['0'],dataStore[weekArray[6]]['1'],dataStore[weekArray[6]]['2'],dataStore[weekArray[6]]['3'],dataStore[weekArray[6]]['4'],dataStore[weekArray[6]]['5'],dataStore[weekArray[6]]['6'],dataStore[weekArray[6]]['7'],dataStore[weekArray[6]]['8'],dataStore[weekArray[6]]['9'],dataStore[weekArray[6]]['10'],dataStore[weekArray[6]]['11'],dataStore[weekArray[6]]['12']]
+
+                  },
+                  {
+                    name:weekArray[7],
+                    data: [dataStore[weekArray[7]]['0'],dataStore[weekArray[7]]['1'],dataStore[weekArray[7]]['2'],dataStore[weekArray[7]]['3'],dataStore[weekArray[7]]['4'],dataStore[weekArray[7]]['5'],dataStore[weekArray[7]]['6'],dataStore[weekArray[7]]['7'],dataStore[weekArray[7]]['8'],dataStore[weekArray[7]]['9'],dataStore[weekArray[7]]['10'],dataStore[weekArray[7]]['11'],dataStore[weekArray[7]]['12']]
+                  },
+                  {
+                    name:weekArray[8],
+                    data: [dataStore[weekArray[8]]['0'],dataStore[weekArray[8]]['1'],dataStore[weekArray[8]]['2'],dataStore[weekArray[8]]['3'],dataStore[weekArray[8]]['4'],dataStore[weekArray[8]]['5'],dataStore[weekArray[8]]['6'],dataStore[weekArray[8]]['7'],dataStore[weekArray[8]]['8'],dataStore[weekArray[8]]['9'],dataStore[weekArray[8]]['10'],dataStore[weekArray[8]]['11'],dataStore[weekArray[8]]['12']]
+                  },
+                  {
+                    name:weekArray[9],
+                    data: [dataStore[weekArray[9]]['0'],dataStore[weekArray[9]]['1'],dataStore[weekArray[9]]['2'],dataStore[weekArray[9]]['3'],dataStore[weekArray[9]]['4'],dataStore[weekArray[9]]['5'],dataStore[weekArray[9]]['6'],dataStore[weekArray[9]]['7'],dataStore[weekArray[9]]['8'],dataStore[weekArray[9]]['9'],dataStore[weekArray[9]]['10'],dataStore[weekArray[9]]['11'],dataStore[weekArray[9]]['12']]
+                  },
+                  {
+                    name:weekArray[10],
+                    data: [dataStore[weekArray[10]]['0'],dataStore[weekArray[10]]['1'],dataStore[weekArray[10]]['2'],dataStore[weekArray[10]]['3'],dataStore[weekArray[10]]['4'],dataStore[weekArray[10]]['5'],dataStore[weekArray[10]]['6'],dataStore[weekArray[10]]['7'],dataStore[weekArray[10]]['8'],dataStore[weekArray[10]]['9'],dataStore[weekArray[10]]['10'],dataStore[weekArray[10]]['11'],dataStore[weekArray[10]]['12']]
+                  },
+                  {
+                    name:weekArray[11],
+                    data: [dataStore[weekArray[11]]['0'],dataStore[weekArray[11]]['1'],dataStore[weekArray[11]]['2'],dataStore[weekArray[11]]['3'],dataStore[weekArray[11]]['4'],dataStore[weekArray[11]]['5'],dataStore[weekArray[11]]['6'],dataStore[weekArray[11]]['7'],dataStore[weekArray[11]]['8'],dataStore[weekArray[11]]['9'],dataStore[weekArray[11]]['10'],dataStore[weekArray[11]]['11'],dataStore[weekArray[11]]['12']]
+                  },
+                  {
+                    name:weekArray[12],
+                    data: [dataStore[weekArray[12]]['0'],dataStore[weekArray[12]]['1'],dataStore[weekArray[12]]['2'],dataStore[weekArray[12]]['3'],dataStore[weekArray[12]]['4'],dataStore[weekArray[12]]['5'],dataStore[weekArray[12]]['6'],dataStore[weekArray[12]]['7'],dataStore[weekArray[12]]['8'],dataStore[weekArray[12]]['9'],dataStore[weekArray[12]]['10'],dataStore[weekArray[12]]['11'],dataStore[weekArray[12]]['12']]
+
+                  }
+                ]
+            });
+
+        });
+        MP.api.retention('App Open', {from: moment().subtract(14, 'days'), to:moment(), unit:'day', interval_count: 14, limit: 100, where:'properties["App Open Count"] < 6'}).done(function(results3) {
+            console.log('retention results \n', results3.values());
+            var dataStore = results3.values()
+            _.each(dataStore, function(e){
+               var day = 1
+               _.each(e.counts, function(x){
+                e[day] = x
+                day++
+               })
+               e[0] = e.first
+            })
+
+            console.log("datastore transformation 1 \n", dataStore)
+            _.each(dataStore, function(item){
+              delete item.counts
+              delete item.first
+            })
+            console.log("datastore transformation 2 \n", dataStore)
+            var dataStoreArray = []
+            var weekArray =[]
+            _.each(dataStore, function(data, key){  
+              weekArray.push(key)
+            })
+            $("#new-retention-header").html('New Users Churn')
+            $('#new-retention-users').highcharts({
+                title: {
+                    text: '',
+                    x: -20 //center
+                },
+                xAxis: {
+                    categories: ['Orignal Cohort', '1 Day Later', '2 Days Later', '3 Days Later', '4 Days Later', '5 Days Later',
+                        '6 Days Later', '7 Days Later', "8 Days Later", "9 Days Later", "10 Days Later", "11 Days Later","12 Days Later"]
+                },
+                yAxis: {
+                    title: {
+                        text: 'Number of Users'
+                    },
+                    
+                },
+                legend: {
+                    align: 'center',
+                    borderWidth: 2,
+                    title: {
+                      text: "Returning User Weekly Cohorts"
+                    }
+                },
+                series:[{
+                  name: weekArray[0],
+                  data: [dataStore[weekArray[0]]['0'],dataStore[weekArray[0]]['1'],dataStore[weekArray[0]]['2'],dataStore[weekArray[0]]['3'],dataStore[weekArray[0]]['4'],dataStore[weekArray[0]]['5'],dataStore[weekArray[0]]['6'],dataStore[weekArray[0]]['7'],dataStore[weekArray[0]]['8'],dataStore[weekArray[0]]['9'],dataStore[weekArray[0]]['10'],,dataStore[weekArray[0]]['11'],dataStore[weekArray[0]]['12']]
+                  },
+                  {
+                    name: weekArray[1],
+                    data: [dataStore[weekArray[1]]['0'],dataStore[weekArray[1]]['1'],dataStore[weekArray[0]]['2'],dataStore[weekArray[1]]['3'],dataStore[weekArray[1]]['4'],dataStore[weekArray[1]]['5'],dataStore[weekArray[1]]['6'],dataStore[weekArray[1]]['7'],dataStore[weekArray[1]]['8'],dataStore[weekArray[1]]['9'],dataStore[weekArray[1]]['10'],,dataStore[weekArray[1]]['11'],dataStore[weekArray[1]]['12']]
+                  },
+                  {
+                    name:weekArray[2],
+                    data: [dataStore[weekArray[2]]['0'],dataStore[weekArray[2]]['1'],dataStore[weekArray[2]]['2'],dataStore[weekArray[2]]['3'],dataStore[weekArray[2]]['4'],dataStore[weekArray[2]]['5'],dataStore[weekArray[2]]['6'],dataStore[weekArray[2]]['7'],dataStore[weekArray[2]]['8'],,dataStore[weekArray[2]]['9'],dataStore[weekArray[2]]['10'],dataStore[weekArray[2]]['11'],dataStore[weekArray[2]]['12']]
+                  },
+                  {
+                    name:weekArray[3],
+                    data: [dataStore[weekArray[3]]['0'],dataStore[weekArray[3]]['1'],dataStore[weekArray[3]]['2'],dataStore[weekArray[3]]['3'],dataStore[weekArray[3]]['4'],dataStore[weekArray[3]]['5'],dataStore[weekArray[3]]['6'],dataStore[weekArray[3]]['7'],dataStore[weekArray[3]]['8'],dataStore[weekArray[3]]['9'],dataStore[weekArray[3]]['10'],dataStore[weekArray[3]]['11'],dataStore[weekArray[3]]['12']]
+                  },
+                  {
+                    name:weekArray[4],
+                    data: [dataStore[weekArray[4]]['0'],dataStore[weekArray[4]]['1'],dataStore[weekArray[4]]['2'],dataStore[weekArray[4]]['3'],dataStore[weekArray[4]]['4'],dataStore[weekArray[4]]['5'],dataStore[weekArray[4]]['6'],dataStore[weekArray[4]]['7'],dataStore[weekArray[4]]['8'],dataStore[weekArray[4]]['9'],dataStore[weekArray[4]]['10'],dataStore[weekArray[4]]['11'],dataStore[weekArray[4]]['12']]
+                  },
+                  {
+                    name:weekArray[5],
+                    data: [dataStore[weekArray[5]]['0'],dataStore[weekArray[5]]['1'],dataStore[weekArray[5]]['2'],dataStore[weekArray[5]]['3'],dataStore[weekArray[5]]['4'],dataStore[weekArray[5]]['5'],dataStore[weekArray[5]]['6'],dataStore[weekArray[5]]['7'],dataStore[weekArray[5]]['8'],dataStore[weekArray[5]]['9'],dataStore[weekArray[5]]['10'],dataStore[weekArray[5]]['11'],dataStore[weekArray[5]]['12']]
+                  },
+                  {
+                    name:weekArray[6],
+                    data: [dataStore[weekArray[6]]['0'],dataStore[weekArray[6]]['1'],dataStore[weekArray[6]]['2'],dataStore[weekArray[6]]['3'],dataStore[weekArray[6]]['4'],dataStore[weekArray[6]]['5'],dataStore[weekArray[6]]['6'],dataStore[weekArray[6]]['7'],dataStore[weekArray[6]]['8'],dataStore[weekArray[6]]['9'],dataStore[weekArray[6]]['10'],dataStore[weekArray[6]]['11'],dataStore[weekArray[6]]['12']]
+
+                  },
+                  {
+                    name:weekArray[7],
+                    data: [dataStore[weekArray[7]]['0'],dataStore[weekArray[7]]['1'],dataStore[weekArray[7]]['2'],dataStore[weekArray[7]]['3'],dataStore[weekArray[7]]['4'],dataStore[weekArray[7]]['5'],dataStore[weekArray[7]]['6'],dataStore[weekArray[7]]['7'],dataStore[weekArray[7]]['8'],dataStore[weekArray[7]]['9'],dataStore[weekArray[7]]['10'],dataStore[weekArray[7]]['11'],dataStore[weekArray[7]]['12']]
+                  },
+                  {
+                    name:weekArray[8],
+                    data: [dataStore[weekArray[8]]['0'],dataStore[weekArray[8]]['1'],dataStore[weekArray[8]]['2'],dataStore[weekArray[8]]['3'],dataStore[weekArray[8]]['4'],dataStore[weekArray[8]]['5'],dataStore[weekArray[8]]['6'],dataStore[weekArray[8]]['7'],dataStore[weekArray[8]]['8'],dataStore[weekArray[8]]['9'],dataStore[weekArray[8]]['10'],dataStore[weekArray[8]]['11'],dataStore[weekArray[8]]['12']]
+                  },
+                  {
+                    name:weekArray[9],
+                    data: [dataStore[weekArray[9]]['0'],dataStore[weekArray[9]]['1'],dataStore[weekArray[9]]['2'],dataStore[weekArray[9]]['3'],dataStore[weekArray[9]]['4'],dataStore[weekArray[9]]['5'],dataStore[weekArray[9]]['6'],dataStore[weekArray[9]]['7'],dataStore[weekArray[9]]['8'],dataStore[weekArray[9]]['9'],dataStore[weekArray[9]]['10'],dataStore[weekArray[9]]['11'],dataStore[weekArray[9]]['12']]
+                  },
+                  {
+                    name:weekArray[10],
+                    data: [dataStore[weekArray[10]]['0'],dataStore[weekArray[10]]['1'],dataStore[weekArray[10]]['2'],dataStore[weekArray[10]]['3'],dataStore[weekArray[10]]['4'],dataStore[weekArray[10]]['5'],dataStore[weekArray[10]]['6'],dataStore[weekArray[10]]['7'],dataStore[weekArray[10]]['8'],dataStore[weekArray[10]]['9'],dataStore[weekArray[10]]['10'],dataStore[weekArray[10]]['11'],dataStore[weekArray[10]]['12']]
+                  },
+                  {
+                    name:weekArray[11],
+                    data: [dataStore[weekArray[11]]['0'],dataStore[weekArray[11]]['1'],dataStore[weekArray[11]]['2'],dataStore[weekArray[11]]['3'],dataStore[weekArray[11]]['4'],dataStore[weekArray[11]]['5'],dataStore[weekArray[11]]['6'],dataStore[weekArray[11]]['7'],dataStore[weekArray[11]]['8'],dataStore[weekArray[11]]['9'],dataStore[weekArray[11]]['10'],dataStore[weekArray[11]]['11'],dataStore[weekArray[11]]['12']]
+                  },
+                  {
+                    name:weekArray[12],
+                    data: [dataStore[weekArray[12]]['0'],dataStore[weekArray[12]]['1'],dataStore[weekArray[12]]['2'],dataStore[weekArray[12]]['3'],dataStore[weekArray[12]]['4'],dataStore[weekArray[12]]['5'],dataStore[weekArray[12]]['6'],dataStore[weekArray[12]]['7'],dataStore[weekArray[12]]['8'],dataStore[weekArray[12]]['9'],dataStore[weekArray[12]]['10'],dataStore[weekArray[12]]['11'],dataStore[weekArray[12]]['12']]
+
+                  }
+                ]
+            });
+
+        });
+
+    })
+
     </script>
   </body>
 </html>
