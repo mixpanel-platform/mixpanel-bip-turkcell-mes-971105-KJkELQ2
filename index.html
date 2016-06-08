@@ -21,7 +21,7 @@
     <div class=".container-fluid">
       <div class="row">
         <div class="col-md-12">
-          <h1 class="text-center text-info"><strong>New User Dashboard</strong></h1>
+          <h1 class="text-center text-info"><strong>New User Dashboard</strong></h2>
         </div>
       </div>
       <div class="row">
@@ -84,14 +84,14 @@
               
               var data = MP.Data.inst(json.data)
               
-              $("#new-users-header").html('New Users')
+              $("#new-users-header").html('New Users Feature Usage')
               newUserChart.MPChart('setData', data.values().values)
           })
            MP.api.query('/api/2.0/events/', {event:topEvents, unit: 'day', from:moment().subtract(40, 'days'), to:moment().subtract(10, 'days'), union: 2, type:'general', where: 'properties["App Open Count"] > 5'  }, {dataType: 'json'}).done(function(json) {
               
               var data = MP.Data.inst(json.data)
               
-               $("#returning-users-header").html('Returning Users')
+               $("#returning-users-header").html('Returning Users Feature Usage')
               returningUserChart.MPChart('setData', data.values().values)
           })
         });
